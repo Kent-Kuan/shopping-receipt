@@ -4,6 +4,7 @@ import com.example.shoppingreceipt.dao.ReceiptDAO;
 import com.example.shoppingreceipt.entity.Product;
 import com.example.shoppingreceipt.entity.PurchaseProduct;
 import com.example.shoppingreceipt.entity.State;
+import com.example.shoppingreceipt.exception.NotOfferException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -18,40 +19,50 @@ public class ReceiptService {
     @Autowired
     ReceiptDAO receiptDAO;
 
-    private String input;
     private BigDecimal subTotal;
     private BigDecimal tax;
     private BigDecimal total;
+    private State offerState;
+    private Map<String, Product> offeredProducts;
+    private List<PurchaseProduct> purchasedProductsList;
 
-    public String  create(String input) {
-        this.input = input;
+    public String create(String input) throws NotOfferException {
         this.subTotal = new BigDecimal(0);
         this.tax = new BigDecimal(0);
         this.total = new BigDecimal(0);
+        this.initReceipt(input);
         return generateReceipt();
     }
 
-    private String generateReceipt() {
+    private void initReceipt(String input) {
         String locationState = extractLocationState(input).toUpperCase();
-        State state = receiptDAO.findStateByName(locationState);
-        List<PurchaseProduct> purchaseProductsList = transformToPurchaseProduct(input);
+        this.offerState = receiptDAO.findStateByName(locationState);
+        if(offerState == null)
+            throw new NotOfferException(901, "No offer the location state.");
 
-        List<String> purchasedProductsName = purchaseProductsList.stream().map(PurchaseProduct::getProductName).collect(Collectors.toList());
-        Map<String, Product> products = receiptDAO.findCategoriesByProducts(purchasedProductsName);
+        this.purchasedProductsList = transformToPurchaseProduct(input);
+        List<String> purchasedProductsName = purchasedProductsList.stream().map(PurchaseProduct::getProductName).collect(Collectors.toList());
+        this.offeredProducts = receiptDAO.findCategoriesByProducts(purchasedProductsName);
+        if(offeredProducts.size() != purchasedProductsName.size())
+            throw new NotOfferException(902, "No offer the product or category");
+    }
 
-        for(PurchaseProduct purchaseProduct : purchaseProductsList) {
-            Product product = products.get(purchaseProduct.getProductName());
+    private void calculate() {
+        for(PurchaseProduct purchaseProduct : purchasedProductsList) {
+            Product product = offeredProducts.get(purchaseProduct.getProductName());
             BigDecimal subPrice = new BigDecimal(purchaseProduct.getPrice()).multiply(new BigDecimal(purchaseProduct.getQuantity()));
             subTotal = subTotal.add(subPrice);
-            if(!state.getTaxFreeCategories().contains(product.getCategory()))
-                tax = tax.add(subPrice.multiply(new BigDecimal(state.getTax())));
+            if(!offerState.getTaxFreeCategories().contains(product.getCategory()))
+                tax = tax.add(subPrice.multiply(new BigDecimal(offerState.getTax())));
         }
-
         tax = nearestDotFive(tax);
         total = subTotal.add(tax);
+    }
 
+    private String generateReceipt() throws NotOfferException {
+        calculate();
         String receipt = generateHeader() +
-                generatePurchaseProducts(purchaseProductsList) +
+                generatePurchaseProducts(purchasedProductsList) +
                 generateTotal(subTotal.toString(), tax.toString(), total.toString());
         return receipt;
     }
