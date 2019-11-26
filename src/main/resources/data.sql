@@ -1,0 +1,2 @@
+insert into state_tax values ('CA', 0.0975, 'food'), ('NY', 0.08875, 'food, clothing');
+insert into product values ( 'book', 'others' ),('pencils', 'others'), ('potato chips', 'food'), ('shirt', 'clothing')
