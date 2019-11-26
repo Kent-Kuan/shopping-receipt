@@ -26,37 +26,45 @@ public class ReceiptService {
     private Map<String, Product> offeredProducts;
     private List<PurchaseProduct> purchasedProductsList;
 
-    public String create(String input) throws NotOfferException {
-        this.subTotal = new BigDecimal(0);
-        this.tax = new BigDecimal(0);
-        this.total = new BigDecimal(0);
-        this.initReceipt(input);
-        return generateReceipt();
+    public void create(String input) {
+        String lowerCaseInput = input.toLowerCase();
+        if (!validInputPattern(lowerCaseInput))
+            throw new NotOfferException(900, "Input format error.");
+        this.initReceipt(lowerCaseInput);
+        generateReceipt();
     }
 
     private void initReceipt(String input) {
+        this.subTotal = new BigDecimal(0);
+        this.tax = new BigDecimal(0);
+        this.total = new BigDecimal(0);
+
         String locationState = extractLocationState(input).toUpperCase();
         this.offerState = receiptDAO.findStateByName(locationState);
-        if(offerState == null)
+        if (offerState == null)
             throw new NotOfferException(901, "No offer the location state.");
 
         this.purchasedProductsList = transformToPurchaseProduct(input);
         List<String> purchasedProductsName = purchasedProductsList.stream().map(PurchaseProduct::getProductName).collect(Collectors.toList());
         this.offeredProducts = receiptDAO.findCategoriesByProducts(purchasedProductsName);
-        if(offeredProducts.size() != purchasedProductsName.size())
+        if (offeredProducts.size() != purchasedProductsName.size())
             throw new NotOfferException(902, "No offer the product or category");
     }
 
     private void calculate() {
-        for(PurchaseProduct purchaseProduct : purchasedProductsList) {
+        for (PurchaseProduct purchaseProduct : purchasedProductsList) {
             Product product = offeredProducts.get(purchaseProduct.getProductName());
             BigDecimal subPrice = new BigDecimal(purchaseProduct.getPrice()).multiply(new BigDecimal(purchaseProduct.getQuantity()));
             subTotal = subTotal.add(subPrice);
-            if(!offerState.getTaxFreeCategories().contains(product.getCategory()))
+            if (!offerState.getTaxFreeCategories().contains(product.getCategory()))
                 tax = tax.add(subPrice.multiply(new BigDecimal(offerState.getTax())));
         }
         tax = nearestDotFive(tax);
         total = subTotal.add(tax);
+    }
+
+    private boolean validInputPattern(String input) {
+        return input.trim().toLowerCase().matches("location:\\s[a-z]{2}(,\\s\\d+\\s[a-z\\s]+\\sat\\s\\d+\\.\\d+)+");
     }
 
     private String generateReceipt() throws NotOfferException {
@@ -94,7 +102,7 @@ public class ReceiptService {
     private List<PurchaseProduct> transformToPurchaseProduct(String input) {
         String purchaseProductsString = input.substring(input.indexOf(",") + 1, input.length());
         List<PurchaseProduct> purchaseProductsList = Arrays.stream(purchaseProductsString.split(",")).map(item -> {
-            String[] product = item.trim().replaceAll("(\\d+)\\s([a-z\\s]+)\\sat\\s(\\d+.\\d+)","$2,$1,$3").split(",");
+            String[] product = item.trim().replaceAll("(\\d+)\\s([a-z\\s]+)\\sat\\s(\\d+.\\d+)", "$2,$1,$3").split(",");
             return new PurchaseProduct(product[0], Integer.parseInt(product[1]), product[2]);
         }).collect(Collectors.toList());
         return purchaseProductsList;
