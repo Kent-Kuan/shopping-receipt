@@ -26,12 +26,12 @@ public class ReceiptService {
     private Map<String, Product> offeredProducts;
     private List<PurchaseProduct> purchasedProductsList;
 
-    public void create(String input) {
+    public String create(String input) {
         String lowerCaseInput = input.toLowerCase();
         if (!validInputPattern(lowerCaseInput))
             throw new NotOfferException(900, "Input format error.");
         this.initReceipt(lowerCaseInput);
-        generateReceipt();
+        return generateReceipt();
     }
 
     private void initReceipt(String input) {

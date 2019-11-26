@@ -18,11 +18,15 @@ public class ShoppingreceiptApplication implements CommandLineRunner {
     ReceiptService receiptService;
     @Override
     public void run(String... args) throws Exception {
-        String input = "Location:CA, 1 books at 17.99, 1 potato chips at 3.99";
-//        String s = "Location: NY, 1 book at 17.99, 3 pencils at 2.99";
-//        String s = "Location: NY, 2 pencils at 2.99, 1 shirt at 29.99";
+        if(args.length == 0) {
+            System.out.println("No input.");
+            return;
+        }
+
+        String input = args[0];
         try {
-            receiptService.create(input);
+            String receipt = receiptService.create(input);
+            System.out.println(receipt);
         } catch (NotOfferException e) {
             System.out.println(String.format("status: " + e.getStatus() +", msg: " + e.getMessage()));
             e.printStackTrace();
